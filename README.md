@@ -12,7 +12,7 @@ Celem oprogramowania jest precyzyjny pomiar czasu reakcji (RT – *Reaction Time
 * **Inkongruentnych (niezgodnych):** Kolor czcionki różni się od znaczenia słowa (np. słowo „ZIELONY” napisane niebieską czcionką).
 * **Neutralnych (opcjonalnie):** Słowa niezwiązane z kolorami (np. „DOM”) lub ciągi znaków (np. „XXXX”) wydrukowane w określonym kolorze.
 
-Aplikacja jest zaprojektowana modułowo. Pozwala to na łatwą replikację badania, modyfikację parametrów bez ingerencji w kod źródłowy Pythona oraz zachowanie przejrzystości struktury na platformach takich jak GitHub.
+Aplikacja jest zaprojektowana modułowo. Pozwala to na łatwą replikację badania, modyfikację parametrów bez ingerencji w kod źródłowy Pythona oraz zachowanie przejrzystości struktury.
 
 ---
 
