@@ -29,7 +29,7 @@ Struktura repozytorium rozdziela logikę, konfigurację, zasoby oraz wyniki.
 ├── stimulus/                 # Pliki wejściowe definiujące warunki eksperymentalne
 │   ├── training_trials.csv   # Lista bodźców dla fazy treningowej
 │   └── main_trials.csv       # Pełna randomizowana lista bodźców dla fazy głównej
-├── results/                  # [Zignorowane w .gitignore] Zrzuty danych eksperymentalnych
+├── results/                  # Wyniki badan
 ├── src/                      # Kod źródłowy aplikacji
 │   ├── main.py               # Punkt wejścia (Entry point) i pętla główna
 │   ├── config.yaml           # Globalny plik konfiguracyjny (parametryzacja)
