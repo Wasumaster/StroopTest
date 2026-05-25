@@ -166,9 +166,9 @@ Wyjaśnienie:
 * Wykonanie bloku treningowego.
 * Obliczenie skuteczności:
 
-[
-Accuracy = \frac{N_{correct}}{N_{total}}
-]
+$$Accuracy = \frac{N_{correct}}{N_{total}}$$
+
+*(Gdzie $N_{correct}$ to liczba poprawnych odpowiedzi, a $N_{total}$ to łączna liczba prób).*
 
 #### Warunek niespełniony
 
