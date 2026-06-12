@@ -1,0 +1,16 @@
+FAZA GŁÓWNA
+
+Trening zakończony sukcesem. Rozpoczynamy fazę główną.
+
+Zasady są takie same jak w treningu:
+  ← (strzałka w lewo)  → CZERWONY
+  ↓ (strzałka w dół)   → ZIELONY
+  → (strzałka w prawo) → NIEBIESKI
+
+Reaguj na KOLOR CZCIONKI, ignorując znaczenie słowa.
+Odpowiadaj jak najszybciej i najdokładniej.
+
+W tej fazie nie otrzymasz informacji zwrotnej
+o poprawności odpowiedzi.
+
+Aby rozpocząć, naciśnij SPACJĘ.

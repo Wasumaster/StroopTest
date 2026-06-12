@@ -1,0 +1,13 @@
+word,color,congruency,corr_ans
+CZERWONY,red,congruent,left
+ZIELONY,green,congruent,down
+NIEBIESKI,blue,congruent,right
+ZIELONY,red,incongruent,left
+NIEBIESKI,green,incongruent,down
+CZERWONY,blue,incongruent,right
+CZERWONY,green,incongruent,down
+NIEBIESKI,red,incongruent,left
+ZIELONY,blue,incongruent,right
+XXXX,red,neutral,left
+XXXX,green,neutral,down
+XXXX,blue,neutral,right

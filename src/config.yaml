@@ -1,0 +1,48 @@
+experiment:
+  name: "Stroop Task"
+  version: "1.1.0"
+  log_level: "info"
+
+gui:
+  full_screen: true
+  window_size: [1920, 1080]
+  bg_color: [0, 0, 0]
+  text_color: [1, 1, 1]
+  font_name: "Open Sans"
+  font_size: 40
+
+timing:
+  fixation_cross: 0.5
+  stimulus_timeout: 3.0
+  isi_min: 0.4
+  isi_max: 0.8
+  feedback_duration: 1.0
+
+keys:
+  response_mapping:
+    left: "red"
+    down: "green"
+    right: "blue"
+  continue: "space"
+  quit: "escape"
+
+thresholds:
+  training_min_accuracy: 0.8
+  max_training_loops: 3
+
+paths:
+  instructions_dir: "instructions"
+  stimulus_dir: "stimulus"
+  results_dir: "results"
+  welcome_file: "welcome.txt"
+  training_inst_file: "training_inst.txt"
+  main_inst_file: "main_inst.txt"
+  training_trials_file: "training_trials.csv"
+  main_trials_file: "main_trials.csv"
+
+messages:
+  training_failed: "Niestety, Twoja dokładność była zbyt niska.\nSpróbuj ponownie, uważnie czytając instrukcję."
+  training_max_reached: "Niestety, nie udało się osiągnąć wymaganego poziomu dokładności\npo maksymalnej liczbie prób treningowych.\n\nDziękujemy za udział.\n\nNaciśnij dowolny klawisz, aby zakończyć."
+  end_screen: "Dziękujemy za udział w badaniu!\n\nTwoje dane zostały zapisane.\n\nNaciśnij dowolny klawisz, aby zakończyć."
+  error_feedback: "BŁĄD"
+  timeout_feedback: "ZA WOLNO"

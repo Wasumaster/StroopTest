@@ -1,0 +1,21 @@
+INSTRUKCJA — FAZA TRENINGOWA
+
+Na ekranie będą pojawiać się słowa napisane różnymi kolorami.
+
+Twoim zadaniem jest reagowanie na KOLOR CZCIONKI,
+a NIE na znaczenie słowa.
+
+MAPOWANIE KLAWISZY:
+  ← (strzałka w lewo)  → CZERWONY
+  ↓ (strzałka w dół)   → ZIELONY
+  → (strzałka w prawo) → NIEBIESKI
+
+PRZYKŁAD:
+Jeśli widzisz słowo "ZIELONY" napisane NIEBIESKĄ czcionką,
+naciśnij strzałkę w PRAWO (niebieski).
+
+Reaguj jak najszybciej i jak najdokładniej.
+W fazie treningowej otrzymasz informację zwrotną
+o poprawności Twojej odpowiedzi.
+
+Aby rozpocząć trening, naciśnij SPACJĘ.

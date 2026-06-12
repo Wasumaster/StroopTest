@@ -1,0 +1,15 @@
+# Środowisko wirtualne
+.venv/
+venv/
+env/
+
+# Pamięć podręczna Pythona
+__pycache__/
+*.pyc
+
+# Pliki wynikowe PsychoPy (żeby nie wyciekły dane badanych)
+results/
+data/
+
+# Logi
+*.log
