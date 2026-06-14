@@ -31,10 +31,10 @@ Struktura repozytorium rozdziela logikę, konfigurację, zasoby oraz wyniki.
 │   └── main_trials.csv       # Pełna randomizowana lista bodźców dla fazy głównej
 ├── results/                  # Wyniki badan
 ├── src/                      # Kod źródłowy aplikacji
-│   ├── main.py               # Punkt wejścia (Entry point) i pętla główna
+│   ├── main.py               # Punkt wejścia (Entry point) i główna logika przebiegu
 │   ├── config.yaml           # Globalny plik konfiguracyjny (parametryzacja)
-│   ├── experiment.py         # Definicja klas zarządzających logiką PsychoPy
-│   └── utils.py              # Funkcje pomocnicze (parsowanie plików, generowanie ID)
+│   ├── procedures.py         # Procedury eksperymentalne i logika pojedynczych prób
+│   └── utils.py              # Funkcje pomocnicze (konfiguracja, pliki, dane badanego)
 ├── requirements.txt          # Zależności systemowe (pip)
 └── README.md                 # Podstawowa dokumentacja i instrukcja uruchomienia
 ```
@@ -133,14 +133,14 @@ Każda iteracja przez zbiór bodźców realizuje poniższy cykl:
 Skrypt:
 
 * ładuje konfigurację,
-* inicjuje obiekt okna,
-* wywołuje `gui.DlgFromDict()`.
+* wywołuje okno dialogowe `gui.DlgFromDict()` do zebrania danych od uczestnika,
+* inicjuje obiekt okna głównego PsychoPy.
 
 Zbierane dane:
 
-* `ID` – identyfikator sesji,
-* `Wiek` – walidacja,
-* `Płeć` – K/M
+* `Wiek` – walidacja, czy podano dodatnią liczbę całkowitą,
+* `Płeć` – K/M do wyboru z listy,
+* `ID` – automatycznie generowane w tle w formacie `SUB_YYYYMMDD_HHMMSS`.
 
 ### Etap 1: Ekran powitalny
 
@@ -202,8 +202,8 @@ Komunikat:
 
 ### Etap 5: Eksperyment właściwy
 
-* Uruchomienie `TrialHandler` / `ExperimentHandler`.
-* Randomizacja prób bez zwracania.
+* Uruchomienie bloku głównego prób (funkcja `run_block`).
+* Pseudorandomizacja prób zapobiegająca powtórzeniom pod rząd (funkcja `shuffle_trials`).
 * Zbieranie pełnych logów i RT.
 
 ### Etap 6: Ekran końcowy i zapis danych
@@ -216,44 +216,34 @@ Komunikat:
 
 ---
 
-## 6. Architektura kodu źródłowego (OOP)
+## 6. Architektura kodu źródłowego (Podejście Proceduralne)
 
-### `ConfigLoader`
+Zgodnie z wymaganiami projekt zaimplementowano w sposób całkowicie proceduralny (bez stosowania klas i programowania obiektowego OOP). Kod jest podzielony na czytelne moduły:
 
-Odpowiada za:
+### `main.py`
 
-* parsowanie YAML,
-* walidację konfiguracji,
-* wartości domyślne,
-* obsługę wyjątków.
+Główny punkt wejścia. Orkiestruje przebieg całego eksperymentu wywołując po kolei niezbędne kroki: zebranie danych przez dialog, inicjalizację okna, wyświetlanie ekranów instrukcji, pętle treningowe z kontrolą progu poprawności i eksperyment właściwy, a na koniec zapis wyników do CSV.
 
-### `SessionLogger`
+### `utils.py`
 
-Odpowiada za:
+Zawiera czyste funkcje narzędziowe, które nie sterują przebiegiem eksperymentu, m.in.:
 
-* tworzenie nazw plików,
-* generowanie UUID/timestampów,
-* ochronę przed nadpisaniem danych.
+* `load_config` – parsowanie i walidacja pliku konfiguracyjnego YAML.
+* `setup_logging` – inicjalizacja logowania z PsychoPy i konfigurowanie zapisów do plików log.
+* `get_subject_data` – zbieranie wieku i płci przez okno dialogowe GUI, weryfikowanie wejścia z automatycznym generowaniem unikalnego ID (`SUB_YYYYMMDD_...`) dla każdego badanego.
+* `load_trials` – ładowanie i walidacja obecności kolumn dla bodźców wejściowych z CSV.
+* `save_results` – bezpieczny zapis zebranych wyników (wszystkich prób) do plików CSV.
 
-### `DisplayManager`
+### `procedures.py`
 
-Singleton zarządzający:
+Odpowiada za logikę wizualną i obsługę samych zadań w oknie PsychoPy:
 
-* `visual.Window`,
-* renderowaniem tekstu,
-* odświeżaniem ramek,
-* synchronizacją `win.flip()`.
+* `show_screen` – wyświetlanie statycznych ekranów tekstowych (np. powitalnego, instrukcji) z obsługą wyjścia.
+* `run_trial` – złożona funkcja wykonująca dokładnie jedną, pełną próbę pomiarową (ISI -> Fixation -> Bodziec z czyszczeniem bufora -> Oczekiwanie na reakcję -> Ewaluacja -> Ewentualny Feedback).
+* `run_block` – pętla iterująca po wielu próbach w danym etapie eksperymentu (trening/faza główna).
+* `shuffle_trials` – autorska logika pseudorandomizacji w ramach której blokowany jest przypadek pojawienia się dwóch identycznych konfiguracji (to samo słowo i ten sam kolor) jedna po drugiej.
 
-### `StroopTask`
-
-Główna klasa sterująca eksperymentem.
-
-Metody:
-
-* `run_instruction_state()`
-* `run_training_loop()`
-* `run_main_experiment()`
-* `save_results()`
+Wszystkie procedury powiązane z wyświetlaniem i pobieraniem klawiszy w sposób ciągły (np. nawet podczas czasów ISI) monitorują klawisz wyjścia awaryjnego (ESC). Gwarantuje to możliwość natychmiastowego przerwania aplikacji, z automatycznym zapisem zebranych do tej pory danych (Escape Hatch).
 
 ---
 
