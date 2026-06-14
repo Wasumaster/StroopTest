@@ -336,4 +336,72 @@ Rejestrowane informacje:
 * ostrzeżenia sprzętowe,
 * informacje diagnostyczne.
 
+---
 
+## 9. Szybki start (Quick Start)
+
+### Wymagania systemowe
+
+* **Python 3.10 lub 3.11** (PsychoPy nie wspiera Python 3.12+)
+* System operacyjny: Windows 10/11, macOS lub Linux
+
+### Instalacja
+
+```bash
+# 1. Sklonuj repozytorium
+git clone <url-repozytorium>
+cd StroopTest-1
+
+# 2. Utwórz środowisko wirtualne (Python 3.11)
+py -3.11 -m venv .venv
+
+# 3. Aktywuj środowisko
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# Windows (CMD):
+.venv\Scripts\activate.bat
+# Linux / macOS:
+source .venv/bin/activate
+
+# 4. Zaktualizuj pip i zainstaluj zależności
+python -m pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+```
+
+### Uruchomienie eksperymentu
+
+```bash
+python src/main.py
+```
+
+### Przebieg
+
+1. Pojawi się okno dialogowe — wpisz **wiek** i wybierz **płeć** (ID generuje się automatycznie).
+2. Ekran powitalny — naciśnij **SPACJĘ** aby kontynuować.
+3. Instrukcja treningowa → faza treningowa (z feedbackiem).
+4. Jeśli dokładność ≥ 80% → przejście do fazy głównej.
+5. Faza główna (bez feedbacku).
+6. Ekran końcowy — wyniki zapisane w katalogu `results/`.
+
+### Klawisze
+
+| Klawisz | Akcja |
+|---------|-------|
+| ← (lewo) | Czerwony |
+| ↓ (dół) | Zielony |
+| → (prawo) | Niebieski |
+| SPACJA | Kontynuuj |
+| ESC | Przerwij eksperyment (dane zostaną zapisane) |
+
+### Wyniki
+
+Plik CSV w formacie `results/{ID}_Stroop_YYYYMMDD_HHMM.csv` z kolumnami:
+
+```
+subject_id, age, gender, block, trial_idx, word, color,
+congruency, expected_key, pressed_key, is_correct, rt, timestamp
+```
+
+### Konfiguracja
+
+Wszystkie parametry eksperymentu (czasy, kolory, progi, klawisze) można modyfikować w pliku `src/config.yaml` bez zmian w kodzie.
