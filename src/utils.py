@@ -98,8 +98,8 @@ def setup_logging(config: Dict[str, Any]) -> None:
 def get_subject_data(config: Dict[str, Any]) -> Optional[Dict[str, str]]:
     """Collect and validate participant demographic data via a GUI dialog.
 
-    Presents a PsychoPy dialog asking for ID, age, and gender.
-    Validates that all fields are filled and age is a positive integer.
+    ID is generated automatically (SUB_YYYYMMDD_HHMMSS).
+    The dialog asks only for age and gender.
 
     Args:
         config: Full configuration dictionary (reserved for future GUI params).
@@ -107,8 +107,9 @@ def get_subject_data(config: Dict[str, Any]) -> Optional[Dict[str, str]]:
     Returns:
         Dictionary with keys 'ID', 'Wiek', 'Płeć', or None if cancelled.
     """
+    auto_id = "SUB_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+
     subject_info = {
-        "ID": "",
         "Wiek": "",
         "Płeć": ["K", "M"],
     }
@@ -116,16 +117,12 @@ def get_subject_data(config: Dict[str, Any]) -> Optional[Dict[str, str]]:
     dlg = gui.DlgFromDict(
         dictionary=subject_info,
         title=config["experiment"]["name"],
-        order=["ID", "Wiek", "Płeć"],
+        order=["Wiek", "Płeć"],
     )
 
     if not dlg.OK:
         logging.warning("Uczestnik anulował dialog danych demograficznych.")
         return None
-
-    if not subject_info["ID"].strip():
-        logging.error("Pole ID jest puste.")
-        raise ValueError("Pole ID nie może być puste.")
 
     try:
         age = int(subject_info["Wiek"])
@@ -139,9 +136,10 @@ def get_subject_data(config: Dict[str, Any]) -> Optional[Dict[str, str]]:
         )
 
     subject_info["Wiek"] = str(age)
+    subject_info["ID"] = auto_id
 
     logging.info(
-        f"Dane uczestnika — ID: {subject_info['ID']}, "
+        f"Dane uczestnika — ID: {auto_id}, "
         f"Wiek: {subject_info['Wiek']}, Płeć: {subject_info['Płeć']}"
     )
 
