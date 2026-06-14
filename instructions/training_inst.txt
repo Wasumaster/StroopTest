@@ -2,7 +2,7 @@ INSTRUKCJA — FAZA TRENINGOWA
 
 Na ekranie będą pojawiać się słowa napisane różnymi kolorami.
 
-Twoim zadaniem jest reagowanie na KOLOR CZCIONKI,
+Twoim zadaniem jest reagowanie na KOLOR CZCIONKI, 
 a NIE na znaczenie słowa.
 
 MAPOWANIE KLAWISZY:

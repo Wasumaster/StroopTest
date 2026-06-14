@@ -1,7 +1,8 @@
-"""Utility functions for the Stroop Task experiment.
+"""Funkcje narzędziowe dla eksperymentu Testu Stroopa.
 
-Handles configuration loading, logging setup, participant data collection,
-results saving, and trial loading with validation.
+Moduł ten obsługuje ładowanie konfiguracji z pliku YAML, inicjalizację systemu
+logowania PsychoPy, zbieranie danych demograficznych uczestnika przez GUI,
+zapis wyników do plików CSV oraz ładowanie i walidację plików z bodźcami (trials).
 """
 
 import csv
@@ -14,26 +15,32 @@ from psychopy import gui, logging
 
 
 def load_config(file_path: str) -> Dict[str, Any]:
-    """Load and validate the YAML configuration file.
+    """Wczytuje i waliduje plik konfiguracyjny YAML.
 
-    Args:
-        file_path: Absolute or relative path to the config.yaml file.
+    Funkcja upewnia się, że plik istnieje oraz zawiera wszystkie niezbędne
+    sekcje wymagane do prawidłowego działania eksperymentu (np. czasy, klawisze).
 
-    Returns:
-        Dictionary containing all configuration parameters.
+    Parametry:
+        file_path: Bezwzględna lub względna ścieżka do pliku config.yaml.
 
-    Raises:
-        FileNotFoundError: If the config file does not exist.
-        ValueError: If required configuration sections are missing.
+    Zwraca:
+        Słownik (Dict) zawierający wszystkie parametry konfiguracyjne.
+
+    Wyjątki:
+        FileNotFoundError: Jeśli plik konfiguracyjny nie istnieje.
+        ValueError: Jeśli brakuje wymaganych sekcji w pliku.
     """
+    # Sprawdzenie czy plik istnieje, by uniknąć błędu w trakcie odczytu
     if not os.path.isfile(file_path):
         raise FileNotFoundError(
             f"Plik konfiguracyjny nie został znaleziony: {file_path}"
         )
 
+    # Odczyt pliku YAML
     with open(file_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
+    # Lista głównych sekcji, które muszą znajdować się w pliku config.yaml
     required_sections = [
         "experiment", "gui", "timing", "keys", "thresholds", "paths", "messages"
     ]
@@ -43,6 +50,7 @@ def load_config(file_path: str) -> Dict[str, Any]:
                 f"Brak wymaganej sekcji '{section}' w pliku konfiguracyjnym."
             )
 
+    # Walidacja szczegółowych parametrów czasowych (kluczowych dla eksperymentu)
     required_timing = [
         "fixation_cross", "stimulus_timeout", "isi_min", "isi_max",
         "feedback_duration"
@@ -53,6 +61,7 @@ def load_config(file_path: str) -> Dict[str, Any]:
                 f"Brak wymaganego parametru timing.{key} w konfiguracji."
             )
 
+    # Walidacja definicji klawiszy (mapowanie klawiszy na kolory)
     if "response_mapping" not in config["keys"]:
         raise ValueError(
             "Brak wymaganego parametru keys.response_mapping w konfiguracji."
@@ -62,14 +71,15 @@ def load_config(file_path: str) -> Dict[str, Any]:
 
 
 def setup_logging(config: Dict[str, Any]) -> None:
-    """Configure PsychoPy logging based on experiment settings.
+    """Konfiguruje system logowania z biblioteki PsychoPy.
 
-    Creates a log file in the results directory with a timestamped name
-    and sets the console log level.
+    Tworzy plik logów w katalogu results z unikalną nazwą opartą o datę i czas.
+    Ustawia poziom logowania w konsoli zgodnie z ustawieniami z konfiguracji.
 
-    Args:
-        config: Full configuration dictionary loaded from config.yaml.
+    Parametry:
+        config: Pełny słownik konfiguracyjny wczytany z config.yaml.
     """
+    # Odczyt poziomu logowania z konfiguracji (domyślnie INFO)
     log_level_str = config["experiment"].get("log_level", "info").upper()
     level_map = {
         "DEBUG": logging.DEBUG,
@@ -79,13 +89,16 @@ def setup_logging(config: Dict[str, Any]) -> None:
     }
     log_level = level_map.get(log_level_str, logging.INFO)
 
+    # Ustalenie ścieżki do katalogu z wynikami i utworzenie go, jeśli nie istnieje
     project_root = _get_project_root()
     results_dir = os.path.join(project_root, config["paths"]["results_dir"])
     os.makedirs(results_dir, exist_ok=True)
 
+    # Wygenerowanie unikalnej nazwy pliku log (np. stroop_log_20240101_120000.log)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_filename = os.path.join(results_dir, f"stroop_log_{timestamp}.log")
 
+    # Ustawienie pliku logującego i globalnego poziomu w konsoli
     logging.LogFile(log_filename, level=log_level, filemode="w")
     logging.console.setLevel(log_level)
 
@@ -96,45 +109,53 @@ def setup_logging(config: Dict[str, Any]) -> None:
 
 
 def get_subject_data(config: Dict[str, Any]) -> Optional[Dict[str, str]]:
-    """Collect and validate participant demographic data via a GUI dialog.
+    """Wyświetla okno dialogowe i pobiera dane demograficzne od uczestnika.
 
-    ID is generated automatically (SUB_YYYYMMDD_HHMMSS).
-    The dialog asks only for age and gender.
+    ID uczestnika jest generowane w tle automatycznie w formacie: SUB_YYYYMMDD_HHMMSS.
+    Okno dialogowe prosi jedynie o podanie Wieku oraz wybór Płci z listy.
+    Dane są dodatkowo walidowane (np. sprawdzane jest czy wiek to liczba dodatnia).
 
-    Args:
-        config: Full configuration dictionary (reserved for future GUI params).
+    Parametry:
+        config: Pełny słownik konfiguracyjny (wykorzystywany do pobrania nazwy w tytule okna).
 
-    Returns:
-        Dictionary with keys 'ID', 'Wiek', 'Płeć', or None if cancelled.
+    Zwraca:
+        Słownik z kluczami 'ID', 'Wiek', 'Płeć' lub None, jeśli uczestnik kliknął Anuluj.
     """
+    # Automatyczne generowanie bezpiecznego i unikalnego identyfikatora badanego
     auto_id = "SUB_" + datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # Struktura danych dla okna dialogowego PsychoPy
     subject_info = {
         "Wiek": "",
-        "Płeć": ["K", "M"],
+        "Płeć": ["K", "M"], # Lista rozwijana do wyboru płci
     }
 
+    # Uruchomienie okna dialogowego
     dlg = gui.DlgFromDict(
         dictionary=subject_info,
         title=config["experiment"]["name"],
         order=["Wiek", "Płeć"],
     )
 
+    # Jeśli użytkownik kliknął Anuluj lub nacisnął ESC w oknie
     if not dlg.OK:
         logging.warning("Uczestnik anulował dialog danych demograficznych.")
         return None
 
+    # Walidacja wprowadzonego wieku
     try:
         age = int(subject_info["Wiek"])
         if age <= 0 or age > 120:
             raise ValueError()
     except (ValueError, TypeError):
         logging.error(f"Nieprawidłowy wiek: {subject_info['Wiek']}")
+        # Rzuca błąd widoczny w konsoli, co uniemożliwia uruchomienie błędnego badania
         raise ValueError(
             f"Wiek musi być liczbą całkowitą dodatnią (podano: "
             f"'{subject_info['Wiek']}')."
         )
 
+    # Zapis danych poprawnie zwalidowanych
     subject_info["Wiek"] = str(age)
     subject_info["ID"] = auto_id
 
@@ -151,56 +172,58 @@ def save_results(
     filename: str,
     config: Dict[str, Any],
 ) -> str:
-    """Save collected trial data to a CSV file in the results directory.
+    """Zapisuje zebrane dane z prób do pliku CSV w katalogu wyników.
 
-    Creates the results directory if it doesn't exist. Uses the filename
-    format: {ID}_Stroop_YYYYMMDD_HHMM.csv
+    Tworzy katalog wynikowy jeśli ten nie istnieje. Nadpisuje plik o tej samej
+    nazwie (co jest kluczowe przy awaryjnym zapisywaniu danych przez ESC).
 
-    Args:
-        data: List of dictionaries, each representing one trial's results.
-        filename: Base filename (without directory path).
-        config: Full configuration dictionary for paths.
+    Parametry:
+        data: Lista słowników, z których każdy reprezentuje wyniki z jednej próby.
+        filename: Podstawowa nazwa pliku (bez ścieżki do katalogu).
+        config: Pełny słownik konfiguracyjny (do pobrania ścieżki katalogu).
 
-    Returns:
-        The full path to the saved CSV file.
+    Zwraca:
+        Pełną ścieżkę absolutną do zapisanego pliku CSV.
     """
     project_root = _get_project_root()
     results_dir = os.path.join(project_root, config["paths"]["results_dir"])
-    os.makedirs(results_dir, exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True) # Zabezpieczenie przed brakiem folderu
 
     filepath = os.path.join(results_dir, filename)
 
+    # Definicja wszystkich wymaganych kolumn w pliku wyjściowym CSV
     fieldnames = [
         "subject_id", "age", "gender", "block", "trial_idx",
         "word", "color", "congruency", "expected_key", "pressed_key",
         "is_correct", "rt", "timestamp",
     ]
 
+    # Zapis danych korzystając z wbudowanego modułu csv
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+        writer.writeheader() # Zapisuje nazwy kolumn
         for row in data:
-            writer.writerow(row)
+            writer.writerow(row) # Zapisuje poszczególne próby
 
     logging.info(f"Wyniki zapisane do: {filepath} ({len(data)} prób)")
     return filepath
 
 
 def load_trials(csv_path: str) -> List[Dict[str, str]]:
-    """Load and validate trial definitions from a CSV file.
+    """Ładuje i waliduje definicje prób z pliku CSV z bodźcami (stimulus).
 
-    Verifies that the CSV contains all required columns:
-    word, color, congruency, corr_ans.
+    Upewnia się, że wejściowy plik CSV posiada wszystkie kolumny wymagane
+    do poprawnego przeprowadzenia eksperymentu: word, color, congruency, corr_ans.
 
-    Args:
-        csv_path: Path to the CSV file with trial definitions.
+    Parametry:
+        csv_path: Ścieżka do pliku CSV z definicjami bodźców.
 
-    Returns:
-        List of dictionaries, each representing one trial row.
+    Zwraca:
+        Listę słowników, gdzie każdy słownik to jedna próba eksperymentalna.
 
-    Raises:
-        FileNotFoundError: If the CSV file does not exist.
-        ValueError: If required columns are missing or file is empty.
+    Wyjątki:
+        FileNotFoundError: Jeśli plik CSV nie istnieje.
+        ValueError: Jeśli brakuje wymaganych kolumn w pliku.
     """
     if not os.path.isfile(csv_path):
         logging.error(f"Plik bodźców nie istnieje: {csv_path}")
@@ -217,6 +240,7 @@ def load_trials(csv_path: str) -> List[Dict[str, str]]:
             logging.error(f"Plik bodźców jest pusty: {csv_path}")
             raise ValueError(f"Plik bodźców jest pusty: {csv_path}")
 
+        # Weryfikacja nagłówków CSV za pomocą porównania zbiorów (set)
         actual_columns = set(reader.fieldnames)
         missing = required_columns - actual_columns
         if missing:
@@ -241,27 +265,32 @@ def load_trials(csv_path: str) -> List[Dict[str, str]]:
 
 
 def generate_results_filename(subject_id: str) -> str:
-    """Generate a timestamped results filename for the given subject.
+    """Generuje nazwę pliku wynikowego z dokładnym timestampem.
 
-    Args:
-        subject_id: Participant's ID string.
+    Zabezpiecza to przed przypadkowym nadpisaniem plików, nawet przy tym samym ID.
 
-    Returns:
-        Filename in format: {ID}_Stroop_YYYYMMDD_HHMM.csv
+    Parametry:
+        subject_id: Unikalne ID badanego.
+
+    Zwraca:
+        Złożona nazwa pliku: np. SUB_2026..._Stroop_2026..._HHMM.csv
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     return f"{subject_id}_Stroop_{timestamp}.csv"
 
 
 def build_trial_path(config: Dict[str, Any], filename_key: str) -> str:
-    """Build absolute path to a stimulus CSV file.
+    """Buduje absolutną ścieżkę do pliku z warunkami badawczymi (stimulus).
 
-    Args:
-        config: Full configuration dictionary.
-        filename_key: Key in config['paths'] for the target file.
+    Odwołuje się dynamicznie do katalogu nadrzędnego projektu, zapewniając
+    że skrypt zadziała na każdym komputerze, niezależnie od miejsca rozpakowania.
 
-    Returns:
-        Absolute path to the stimulus CSV file.
+    Parametry:
+        config: Pełna konfiguracja systemu.
+        filename_key: Klucz z sekcji 'paths' wskazujący na konkretny plik (np. 'main_trials_file').
+
+    Zwraca:
+        Pełna, bezwzględna ścieżka do pliku.
     """
     project_root = _get_project_root()
     return os.path.join(
@@ -272,14 +301,14 @@ def build_trial_path(config: Dict[str, Any], filename_key: str) -> str:
 
 
 def build_instruction_path(config: Dict[str, Any], filename_key: str) -> str:
-    """Build absolute path to an instruction text file.
+    """Buduje absolutną ścieżkę do pliku tekstowego z instrukcją.
 
-    Args:
-        config: Full configuration dictionary.
-        filename_key: Key in config['paths'] for the target file.
+    Parametry:
+        config: Pełna konfiguracja systemu.
+        filename_key: Klucz z sekcji 'paths' wskazujący na instrukcję (np. 'welcome_file').
 
-    Returns:
-        Absolute path to the instruction text file.
+    Zwraca:
+        Pełna, bezwzględna ścieżka do pliku instrukcji.
     """
     project_root = _get_project_root()
     return os.path.join(
@@ -290,16 +319,16 @@ def build_instruction_path(config: Dict[str, Any], filename_key: str) -> str:
 
 
 def load_instruction_text(file_path: str) -> str:
-    """Load instruction text content from a file.
+    """Wczytuje treść instrukcji z pliku tekstowego do zmiennej.
 
-    Args:
-        file_path: Path to the instruction .txt file.
+    Parametry:
+        file_path: Bezwzględna ścieżka do pliku instrukcji .txt.
 
-    Returns:
-        The text content of the file.
+    Zwraca:
+        Pełną treść pliku jako jeden łańcuch znaków (string).
 
-    Raises:
-        FileNotFoundError: If the file does not exist.
+    Wyjątki:
+        FileNotFoundError: Jeśli plik instrukcji nie istnieje.
     """
     if not os.path.isfile(file_path):
         logging.error(f"Plik instrukcji nie istnieje: {file_path}")
@@ -315,11 +344,12 @@ def load_instruction_text(file_path: str) -> str:
 
 
 def _get_project_root() -> str:
-    """Determine the project root directory.
+    """Ustalanie absolutnej ścieżki do głównego katalogu projektu.
 
-    Assumes the src/ directory is directly under the project root.
+    Zakłada, że skrypty uruchomieniowe (w tym utils.py) zawsze znajdują się 
+    wewnątrz folderu `src/`, dlatego wykonuje dwukrotne pobranie katalogu rodzica.
 
-    Returns:
-        Absolute path to the project root.
+    Zwraca:
+        Absolutną ścieżkę do katalogu `StroopTest-1`.
     """
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
