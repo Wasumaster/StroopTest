@@ -1,15 +1,34 @@
 """Główny punkt wejścia dla Testu Stroopa.
 
-Plik ten odpowiada za orkiestrację całego przepływu procedury eksperymentalnej.
-Nie zawiera on logiki wyświetlania (ta znajduje się w procedures.py),
-jednak dyryguje kolejnością działania poszczególnych elementów:
-  0. Załadowanie konfiguracji, inicjalizacja logowania, pobranie danych badanego (GUI).
-  1. Wyświetlenie ekranu powitalnego i zgody RODO (Informed Consent).
-  2. Ekran z instrukcją dla treningu.
-  3. Pętla treningowa, badająca skuteczność reakcji (Accuracy threshold gating).
-  4. Ekran z instrukcją wejścia do fazy głównej.
-  5. Pętla fazy głównej eksperymentu (zapis wszystkich bodźców).
-  6. Ekran końcowy z automatycznym zapisem i eleganckim zamknięciem okna.
+Plik ten odpowiada za orkiestrację całego przepływu eksperymentu. Nie zawiera
+logiki renderowania bodźców (ta znajduje się w procedures.py), lecz dyryguje
+kolejnością działania poszczególnych etapów:
+
+  Etap 0 — Inicjalizacja:
+      Wczytanie konfiguracji z config.yaml, uruchomienie systemu logowania,
+      zebranie danych demograficznych uczestnika przez okno GUI systemu operacyjnego.
+
+  Etap 1 — Sekwencja instrukcji graficznych:
+      Wyświetlenie trzech ekranów instrukcji (instrukcja_1, instrukcja_2, instrukcja_3)
+      w formacie graficznym (JPG). Każdy ekran czeka na naciśnięcie spacji przez uczestnika.
+
+  Etap 2 — Pętla treningowa:
+      Trening z feedbackiem. Uczestnik poznaje zadanie i mapowanie klawiszy na kolory.
+      Jeśli wskaźnik poprawności jest poniżej progu (domyślnie 80%), trening jest
+      powtarzany. Maksymalna liczba powtórzeń jest zdefiniowana w konfiguracji.
+      Jeśli uczestnik nie osiągnie progu po maksymalnej liczbie prób, eksperyment
+      kończy się bez fazy głównej.
+
+  Etap 3 — Instrukcja po treningu:
+      Po zaliczeniu treningu wyświetlany jest osobny ekran graficzny informujący
+      o rozpoczęciu właściwej fazy eksperymentalnej.
+
+  Etap 4 — Faza główna:
+      Właściwy pomiar — pełna pula bodźców bez feedbacku. Wszystkie dane są
+      zapisywane do pliku CSV.
+
+  Etap 5 — Zakończenie:
+      Finalny zapis wyników, wyświetlenie ekranu końcowego, zamknięcie okna.
 """
 
 import os
@@ -19,15 +38,15 @@ from psychopy import core, logging, visual
 from procedures import (
     calculate_accuracy,
     run_block,
+    show_instruction_image,
     show_screen,
 )
 from utils import (
-    build_instruction_path,
+    build_instruction_image_path,
     build_trial_path,
     generate_results_filename,
     get_subject_data,
     load_config,
-    load_instruction_text,
     load_trials,
     save_results,
     setup_logging,
@@ -35,119 +54,139 @@ from utils import (
 
 
 def main() -> None:
-    """Główna funkcja uruchamiająca i nadzorująca cały Test Stroopa."""
+    """Główna funkcja uruchamiająca i nadzorująca cały Test Stroopa.
+
+    Funkcja jest jedynym punktem wejścia do eksperymentu. Organizuje przepływ
+    sterowania pomiędzy poszczególnymi etapami, zarządza zasobami (okno PsychoPy,
+    pliki wynikowe) oraz zapewnia awaryjny zapis danych w bloku try/finally.
+    """
 
     # ---- Etap 0: Inicjalizacja środowiska i zebranie danych od badanego ----
-    
-    # 0.1 Skrypt najpierw lokalizuje absolutną ścieżkę konfiguracyjną (w src/) i ją wczytuje
+
+    # Lokalizacja pliku konfiguracyjnego relative do położenia tego skryptu.
+    # Użycie os.path.abspath(__file__) gwarantuje poprawność ścieżki niezależnie
+    # od katalogu roboczego, z którego uruchomiono skrypt.
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
     config = load_config(config_path)
-    
-    # 0.2 Logowanie jest uruchamiane natychmiast, żeby ewentualne awarie UI już mogły zostać wyśledzone
+
+    # Logowanie uruchamiane jest natychmiast po wczytaniu konfiguracji,
+    # by ewentualne błędy inicjalizacji okna były już rejestrowane w pliku logu.
     setup_logging(config)
     logging.info(
         f"Eksperyment: {config['experiment']['name']} "
         f"v{config['experiment']['version']} — Rozpoczęty!"
     )
 
-    # 0.3 Zebranie i zwalidowanie WIEKU i PŁCI na małym osobnym okienku interfejsu systemu (OS GUI)
+    # Zebranie danych demograficznych (Wiek, Płeć) przez systemowe okno dialogowe.
+    # ID uczestnika generowane jest automatycznie na podstawie bieżącego czasu.
     subject_data = get_subject_data(config)
-    
-    # Przerwanie działania bez zapisywania w ogóle czegokolwiek jeśli uczestnik zamknął okienko krzyżykiem / przyciskiem Anuluj
+
+    # Jeśli uczestnik zamknie okno dialogowe (krzyżyk / Anuluj), eksperyment kończy się
+    # bez zapisu czegokolwiek — nie doszło do żadnego pomiaru.
     if subject_data is None:
         logging.warning("Eksperyment anulowany przez uczestnika podczas wypełniania GUI.")
-        core.quit() # core.quit() ubija wszystkie wewnątrz-wątkowe sprawy PsychoPy i zamyka skrypt bezbłędnie
+        core.quit()
         return
 
-    # 0.4 Wygenerowanie bazowej i bezpiecznej nazwy pliku gdzie znajdą się wyniki
+    # Wygenerowanie unikalnej nazwy pliku wynikowego na podstawie ID uczestnika.
+    # Plik jest tworzony (lub nadpisywany) dopiero przy pierwszym zapisie danych.
     results_filename = generate_results_filename(subject_data["ID"])
-    all_results = [] # Inicjalizacja głównego rejestru, to tutaj wędrują dane co każdą pojedynczą próbę
+    all_results = []  # Główna lista gromadząca wyniki wszystkich prób z całej sesji
 
-    # Parametry pomocnicze potrzebne przy przekazywaniu funkcji zapisu awaryjnego np. przy kliknięciu ESC
+    # Referencje do funkcji i argumentów zapisu — przekazywane dalej jako parametry,
+    # aby wszystkie procedury mogły wykonać awaryjny zapis przy naciśnięciu ESC.
     save_fn = save_results
     save_args = (results_filename, config)
 
-    # 0.5 Inicjalizacja okna Fullscreen dla eksperymentu
+    # Inicjalizacja okna pełnoekranowego PsychoPy.
+    # allowGUI=False ukrywa paski okna i kursor myszy, co minimalizuje rozproszenia.
     gui_cfg = config["gui"]
     window = visual.Window(
-        size=gui_cfg["window_size"],    # z config.yaml, np. 1920x1080 
-        fullscr=gui_cfg["full_screen"], # czy pełny ekran czy w małym okienku?
-        color=gui_cfg["bg_color"],      # Kolor w PsychoPy np. [-1, -1, -1] co da perfekcyjną i jednorodną czerń
-        units="pix",                    # Ważne: skalujemy pozycje stymulacji w pikselach
-        allowGUI=False,                 # Zablokowanie myszki i ukrycie belek okien podczas testu zmusza to do skupienia
+        size=gui_cfg["window_size"],    # Rozdzielczość okna (z config.yaml)
+        fullscr=gui_cfg["full_screen"], # Tryb pełnoekranowy
+        color=gui_cfg["bg_color"],      # Kolor tła (domyślnie czarny: [0, 0, 0])
+        units="pix",                    # Pozycje i rozmiary w pikselach
+        allowGUI=False,                 # Brak dekoracji okna podczas eksperymentu
     )
 
-    logging.info("Główne okno PsychoPy zostało zainicjowane z sukcesem.")
+    logging.info("Główne okno PsychoPy zostało zainicjowane.")
 
-    # Cały proces badawczy łapiemy w bloku TRY by bezwarunkowo zapisać ułomne/niewyraźne dane nawet jeśli
-    # coś wyrzuci niespodziewany błąd lub awarię w samym sercu PsychoPy.
+    # Blok try/finally zapewnia, że okno zostanie zawsze zamknięte i core.quit()
+    # zostanie wywołane — nawet jeśli eksperyment zakończy się wyjątkiem.
     try:
-        # ---- Etap 1: Ekran Powitalny (Informed Consent) ----
-        welcome_path = build_instruction_path(config, "welcome_file")
-        welcome_text = load_instruction_text(welcome_path)
-        
-        # Ekran ten nie odlicza czasu, leży tak długo póki badany nie zatwierdzi go wpisanym w config
-        # klawiszem kontynuacji (np. Spacja).
-        show_screen(
-            window, welcome_text, config["keys"]["continue"], config,
-            all_results, save_fn, save_args,
-        )
-        logging.info("Uczestnik zatwierdził informacje na ekranie powitalnym.")
 
-        # ---- Etap 2 oraz 3: Pętla instrukcji + samego bloku treningowego ----
-        
-        # Przygotowanie zasobów do bloku treningowego
+        # ---- Etap 1: Sekwencja instrukcji graficznych ----
+        #
+        # Trzy ekrany instrukcji są wyświetlane jeden po drugim przed treningiem.
+        # Kolejność wyświetlania odpowiada kolejności na liście 'instruction_images'
+        # w config.yaml: instrukcja_1 → instrukcja_2 → instrukcja_3.
+        # Każdy ekran czeka na naciśnięcie spacji przez uczestnika.
+        #
+        # Instrukcje są plikami graficznymi (JPG) — przechowywane w katalogu /instructions/.
+        # Graficzny format pozwala na dokładne i bogate wizualnie przedstawienie zasad zadania.
+
+        instruction_images = config["paths"]["instruction_images"]
+        logging.info(f"Sekwencja instrukcji — {len(instruction_images)} ekranów do wyświetlenia.")
+
+        for img_filename in instruction_images:
+            img_path = build_instruction_image_path(config, img_filename)
+            logging.info(f"Wyświetlanie instrukcji: {img_filename}")
+            show_instruction_image(
+                window, img_path, config["keys"]["continue"],
+                config, all_results, save_fn, save_args,
+            )
+
+        logging.info("Uczestnik zapoznał się ze wszystkimi ekranami instrukcji.")
+
+        # ---- Etap 2: Pętla treningowa ----
+        #
+        # Faza treningowa trwa do momentu osiągnięcia przez uczestnika
+        # minimalnego progu poprawności (domyślnie 80%) lub wyczerpania
+        # maksymalnej liczby dozwolonych powtórzeń.
+        #
+        # W trakcie treningu po każdej błędnej odpowiedzi lub braku odpowiedzi
+        # wyświetlany jest komunikat feedbacku (np. "BŁĄD" lub "ZA WOLNO").
+        # Feedback uczy uczestnika prawidłowego mapowania klawiszy na kolory.
+
         training_trials_path = build_trial_path(config, "training_trials_file")
         training_trials = load_trials(training_trials_path)
-        
-        training_inst_path = build_instruction_path(config, "training_inst_file")
-        training_inst_text = load_instruction_text(training_inst_path)
 
-        # Ograniczenia i minimalne progi odczytane z konfiguracji
         max_loops = config["thresholds"]["max_training_loops"]
         min_accuracy = config["thresholds"]["training_min_accuracy"]
         training_passed = False
 
-        # W przypadku złego wykonania badania przez uczestnika aplikacja potrafi dynamicznie przywrócić
-        # go ponownie do instrukcji i ponowić cały trening
         for loop_idx in range(1, max_loops + 1):
-            logging.info(f"Faza treningowa — aktualny przebieg: Pętla {loop_idx}/{max_loops}")
+            logging.info(f"Faza treningowa — pętla {loop_idx}/{max_loops}")
 
-            # Wyświetl wprowadzenie teoretyczne
-            show_screen(
-                window, training_inst_text, config["keys"]["continue"],
-                config, all_results, save_fn, save_args,
-            )
-
-            # Uruchom faktyczny trening
+            # Uruchomienie bloku treningowego z aktywnym feedbackiem
             training_results = run_block(
                 window=window,
                 trials_list=training_trials,
                 config=config,
-                is_training=True, # Argument 'True' pozwala algorytmom wyświetlać duże, czerwone hasło "Błąd!" przy złym wciśnięciu
+                is_training=True,   # True = feedback po błędach jest aktywny
                 subject_data=subject_data,
                 results=all_results,
                 save_fn=save_fn,
                 save_args=save_args,
             )
 
-            # Pobranie wskaźnika wyników Accuracy na ułamkach od 0.0 do 1.0
+            # Obliczenie wskaźnika poprawności po zakończeniu bloku treningowego
             accuracy = calculate_accuracy(training_results)
             logging.info(
-                f"Obliczanie dokładności po ukończeniu Pętli {loop_idx}: accuracy = {accuracy:.2%} "
-                f"(Próg zdawalności wymaga min.: {min_accuracy:.0%})"
+                f"Dokładność po pętli {loop_idx}: {accuracy:.2%} "
+                f"(wymagane minimum: {min_accuracy:.0%})"
             )
 
-            # Weryfikacja czy użytkownik sprostał minimalnemu progowi (np 80% poprawnych reakcji)
             if accuracy >= min_accuracy:
                 training_passed = True
-                logging.info("Trening zwieńczony powodzeniem - próg dokładności spełniony.")
+                logging.info("Trening zaliczony — próg dokładności osiągnięty.")
                 break
 
-            # Jeżeli to była wpadka to uruchom ponownie (chyba że nie ma już limitów prób w puli)
+            # Jeśli próg nie został osiągnięty i pozostały jeszcze próby, wyświetl
+            # komunikat zachęcający do ponownego zapoznania się z instrukcją.
             if loop_idx < max_loops:
                 logging.warning(
-                    f"Trening oblał próg testowy. Podejście {loop_idx} było niezadowalające."
+                    f"Dokładność poniżej progu w pętli {loop_idx} — powtarzanie treningu."
                 )
                 show_screen(
                     window,
@@ -157,59 +196,72 @@ def main() -> None:
                     all_results, save_fn, save_args,
                 )
 
-        # Brak sukcesu po osiągnięciu maksymalnego limitu np 3 przebiegów dyskwalifikuje użytkownika
+        # Jeśli po wszystkich dozwolonych powtórzeniach próg nie został osiągnięty,
+        # uczestnik jest dyskwalifikowany — dane są zapisywane i eksperyment kończy się.
         if not training_passed:
             logging.warning(
-                f"Dyskwalifikacja. Uczestnik wielokrotnie zawiódł procedurę na treningu po {max_loops} podejściach."
+                f"Dyskwalifikacja — uczestnik nie osiągnął progu po {max_loops} powtórzeniach."
             )
-            
-            # Nawet jeśli oblano, to zapisujemy te dane po treningu by zweryfikować co było u takiego delikwenta tak ułomne.
             save_results(all_results, results_filename, config)
-            
             show_screen(
                 window,
                 config["messages"]["training_max_reached"],
                 config["keys"]["continue"],
                 config,
             )
-            # Zamknij bez wejścia do gry głownej
             window.close()
             core.quit()
             return
 
-        # ---- Etap 4: Ekran powiadamiający o rozpoczęciu trudnej fazy (Faza Główna) ----
-        main_inst_path = build_instruction_path(config, "main_inst_file")
-        main_inst_text = load_instruction_text(main_inst_path)
-        show_screen(
-            window, main_inst_text, config["keys"]["continue"], config,
-            all_results, save_fn, save_args,
-        )
-        logging.info("Użytkownik zadeklarował gotowość (wcisnął spację). Faza Główna zaraz zostanie odsłonięta.")
+        # ---- Etap 3: Instrukcja po zakończeniu fazy treningowej ----
+        #
+        # Po zaliczeniu treningu wyświetlany jest specjalny ekran graficzny,
+        # który informuje uczestnika o zakończeniu treningu i nadchodzącym
+        # początku właściwej fazy eksperymentalnej. Uczestnik naciska spację,
+        # aby natychmiast rozpocząć fazę główną.
 
-        # ---- Etap 5: Eksperyment Właściwy (Szeroka pula bodźców) ----
+        post_training_img = config["paths"]["post_training_instruction_image"]
+        post_training_path = build_instruction_image_path(config, post_training_img)
+        logging.info(f"Wyświetlanie instrukcji po treningu: {post_training_img}")
+        show_instruction_image(
+            window, post_training_path, config["keys"]["continue"],
+            config, all_results, save_fn, save_args,
+        )
+        logging.info("Uczestnik gotowy do fazy głównej — nacisnął spację.")
+
+        # ---- Etap 4: Faza główna eksperymentu ----
+        #
+        # Właściwy pomiar — pełna pula bodźców (zgodne, niezgodne, neutralne)
+        # prezentowana w losowej kolejności. W tej fazie feedback jest wyłączony
+        # (is_training=False), co pozwala na zebranie czystych danych bez wpływu
+        # informacji zwrotnej na zachowanie uczestnika.
+
         main_trials_path = build_trial_path(config, "main_trials_file")
         main_trials = load_trials(main_trials_path)
 
-        logging.info("Silnik proceduralny: Inicjacja Fazy Głównej")
-        
-        # Wypalenie pętli głównej (tu zazwyczaj znajduje się ok 50 - 150 bodźców zaleznie od CSV)
+        logging.info("Inicjacja fazy głównej eksperymentu.")
+
         run_block(
             window=window,
             trials_list=main_trials,
             config=config,
-            is_training=False, # Istotna zmiana - 'False' odcina procedurze możliwość pokazania feedbacku ("Błąd!") uczestnikowi. Faza ta jest milcząca
+            is_training=False,  # False = brak feedbacku w fazie głównej
             subject_data=subject_data,
             results=all_results,
             save_fn=save_fn,
             save_args=save_args,
         )
-        logging.info("Sukces. Procedury fazy głównej sfinalizowane bez awarii.")
+        logging.info("Faza główna zakończona pomyślnie.")
 
-        # ---- Etap 6: Zrzut kompletnej bazy wszystkich cyklów prób do pliku wynikowego ----
+        # ---- Etap 5: Zapis wyników i ekran końcowy ----
+        #
+        # Finalne zapisanie kompletnych danych ze wszystkich blokób (trening + faza główna).
+        # Wyświetlenie komunikatu kończącego z podziękowaniem, który znika po naciśnięciu
+        # dowolnego klawisza przez uczestnika lub badacza.
+
         save_results(all_results, results_filename, config)
-        logging.info(f"Ostateczny zrzut zebranych czasów RT i wciśnięć zapisany.")
+        logging.info("Finalny zapis wyników zakończony.")
 
-        # Wyświetlenie końcowej informacji informującej, że można wezwać badacza i eksperyment się zakończył
         show_screen(
             window,
             config["messages"]["end_screen"],
@@ -217,25 +269,27 @@ def main() -> None:
             config,
         )
 
-    # Zabezpieczenie przed niewiadomą (Exception) gwarantujące awaryjne zapisanie postępów
     except Exception as e:
+        # Zabezpieczenie przed niespodziewanym wyjątkiem — awaryjny zapis danych
+        # zapobiega utracie wszystkich zebranych wyników w przypadku awarii programu.
         logging.error(f"FATALNY BŁĄD w strukturze eksperymentu: {e}")
         try:
             save_results(all_results, results_filename, config)
-            logging.info("Zrzut bufora ratunkowego (Emergency Dump) powiódł się.")
+            logging.info("Awaryjny zapis wyników (Emergency Dump) powiódł się.")
         except Exception as save_err:
-            logging.error(f"Nie powiodło się wykonanie ratunkowego zrzutu wyników do CSV!: {save_err}")
-        # Przekaż wyjątek na górę stosu by było można prześledzić dokładny Call Stack usterki
-        raise
-    
-    # Blok 'finally' wykona się absolutnie ZAWSZE — czy kod przetrwał poprawnie, 
-    # czy uczestnik użył "Escape Hatch", czy wystąpił nagły Exception
+            logging.error(f"Nie powiodło się wykonanie awaryjnego zapisu: {save_err}")
+        raise  # Ponowne zgłoszenie wyjątku, by call stack był widoczny w logach
+
     finally:
+        # Blok finally wykonuje się zawsze — zarówno po normalnym zakończeniu,
+        # jak i po wyjątku lub użyciu ESC (core.quit). Gwarantuje poprawne
+        # uwolnienie zasobów graficznych.
         window.close()
-        logging.info("Silnik renderujący okna odpięty. Moduły zgaszone. Program zakończył proces na dobre.")
+        logging.info("Okno PsychoPy zamknięte. Eksperyment zakończony.")
         core.quit()
 
 
-# Konstrukcja idiomu zabezpieczająca wywołanie (kod wykona się tylko po wywołaniu bezpośrednim modułu)
+# Idiom zabezpieczający przed przypadkowym importem — kod wykonuje się tylko
+# przy bezpośrednim uruchomieniu pliku (python main.py), nie przy imporcie.
 if __name__ == "__main__":
     main()

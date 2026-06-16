@@ -34,9 +34,15 @@ paths:
   instructions_dir: "instructions"
   stimulus_dir: "stimulus"
   results_dir: "results"
-  welcome_file: "welcome.txt"
-  training_inst_file: "training_inst.txt"
-  main_inst_file: "main_inst.txt"
+  # Sekwencja trzech ekranów instrukcji wyświetlanych przed fazą treningową.
+  # Ekrany są wyświetlane w podanej kolejności: instrukcja_1 → instrukcja_2 → instrukcja_3.
+  instruction_images:
+    - "instrukcja_1.jpg"
+    - "instrukcja_2.jpg"
+    - "instrukcja_3.jpg"
+  # Ekran graficzny wyświetlany bezpośrednio po zaliczeniu fazy treningowej,
+  # informujący uczestnika o rozpoczęciu właściwej fazy eksperymentalnej.
+  post_training_instruction_image: "instrukcja_po_fazie_treningowej.jpg"
   training_trials_file: "training_trials.csv"
   main_trials_file: "main_trials.csv"
 

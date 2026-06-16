@@ -8,6 +8,6 @@ CZERWONY,blue,incongruent,right
 CZERWONY,green,incongruent,down
 NIEBIESKI,red,incongruent,left
 ZIELONY,blue,incongruent,right
-XXXX,red,neutral,left
-XXXX,green,neutral,down
-XXXX,blue,neutral,right
+malina,red,neutral,left
+rakieta,green,neutral,down
+zabawa,blue,neutral,right
