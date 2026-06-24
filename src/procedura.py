@@ -28,18 +28,53 @@ def sprawdz_sekwencje(triale):
 
 def przetasuj_triale(triale):
     """
-    Tasuje losowo listę metodą brute-force.
-    Skrypt losuje ułożenie i sprawdza je w funkcji powyżej. Jeśli jest błędne,
-    losuje jeszcze raz. Podejmuje maksymalnie 1000 prób, by zapobiec nieskończonej pętli.
+    Inteligentne tasowanie z GWARANCJĄ 100% braku powtórzeń.
+    Buduje listę krok po kroku, wybierając tylko dozwolone bodźce.
     """
-    przetasowane = list(triale)
-    for _ in range(1000):
-        random.shuffle(przetasowane)
-        if sprawdz_sekwencje(przetasowane):
-            return przetasowane
     
-    print("Uwaga: Pula bodźców jest tak mała, że nie udało się wykluczyć wszystkich powtórzeń.")
-    return przetasowane
+    # --- KROK 1: Zabezpieczenie matematyczne (Zasada Szufladkowa) ---
+    # Jeśli np. na 10 prób wpiszesz w CSV aż 6 razy słowo "CZERWONY", 
+    # to fizycznie NIE DA SIĘ ułożyć tego bez powtórzeń. 
+    zliczenia = {}
+    for t in triale:
+        zliczenia[t["word"]] = zliczenia.get(t["word"], 0) + 1
+        
+    najczestsze_slowo = max(zliczenia, key=zliczenia.get)
+    ile_razy = zliczenia[najczestsze_slowo]
+    limit_matematyczny = (len(triale) + 1) // 2
+    
+    if ile_razy > limit_matematyczny:
+        raise ValueError(
+            f"BŁĄD PLIKU CSV: Słowo '{najczestsze_slowo}' występuje aż {ile_razy} razy "
+            f"na {len(triale)} całkowitych prób. To matematycznie niemożliwe, "
+            f"aby ułożyć z tego sekwencję bez powtórzeń. Zmień proporcje w pliku Excel/CSV!"
+        )
+
+    # --- KROK 2: Inteligentne budowanie sekwencji ---
+    while True:
+        pula = list(triale) # Kopia wszystkich naszych prób (nasz "kapelusz" z losami)
+        wynik = []
+        ostatnie_slowo = None
+        
+        while pula:
+            # Magia dzieje się tutaj: odfiltrowujemy z puli to słowo, które było przed chwilą!
+            dozwolone = [t for t in pula if t["word"] != ostatnie_slowo]
+            
+            if not dozwolone:
+                # Ślepy zaułek! W puli zostały nam np. 2 słowa "ZIELONY", a ostatnie słowo
+                # to też "ZIELONY". Przerywamy tę małą pętlę i zaczynamy losowanie od nowa.
+                break 
+                
+            # Wyciągamy z kapelusza BEZPIECZNY, losowy trial
+            wybrany = random.choice(dozwolone)
+            wynik.append(wybrany)
+            pula.remove(wybrany) # Wyrzucamy wykorzystany los z kapelusza
+            ostatnie_slowo = wybrany["word"] # Zapamiętujemy, co wyciągnęliśmy
+            
+        # Jeśli lista wynikowa jest tak samo długa jak lista z CSV,
+        # oznacza to, że dobrnęliśmy do końca bez ani jednego błędu!
+        if len(wynik) == len(triale):
+            return wynik
 
 def sprawdz_wyjscie(wcisniete_klawisze, okno):
     """

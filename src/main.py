@@ -118,7 +118,7 @@ def main():
         if globalne_wyniki:  # Zapisujemy plik tylko, jeśli zdążyliśmy zarejestrować co najmniej 1 próbę
             katalog_wynikow = os.path.join(katalog_glowny, config["paths"]["results_dir"])
             utils.zapisz_wyniki(globalne_wyniki, katalog_wynikow, dane_badanego["ID"])
-            print(f"Uratowano i zapisano {len(globalne_wyniki)} prób!")
+            print(f"Zapisano {len(globalne_wyniki)} prób!")
             
         # Ostateczne zwolnienie procesów
         okno.close()
