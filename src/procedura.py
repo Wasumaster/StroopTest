@@ -95,8 +95,8 @@ def pokaz_ekran_tekstowy(okno, tekst, config, klawisz_dalej="space"):
         okno, text=tekst, color=config["gui"]["text_color"], 
         font=config["gui"]["font_name"], height=0.04, units="norm"
     )
-    stim.draw() # Rysuje obiekt w buforze pamięci karty graficznej
-    okno.flip() # "Przerzuca" zawartość bufora na fizyczny ekran monitora
+    stim.draw() # Rysuje obiekt w pamięci karty graficznej
+    okno.flip() # "Przerzuca" zawartość na fizyczny ekran monitora
     
     wcisniete = event.waitKeys(keyList=[klawisz_dalej, "escape"])
     sprawdz_wyjscie(wcisniete, okno)
