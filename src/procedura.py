@@ -57,7 +57,7 @@ def przetasuj_triale(triale):
         ostatnie_slowo = None
         
         while pula:
-            # Magia dzieje się tutaj: odfiltrowujemy z puli to słowo, które było przed chwilą!
+            # odfiltrowujemy z puli to słowo, które było przed chwilą!
             dozwolone = [t for t in pula if t["word"] != ostatnie_slowo]
             
             if not dozwolone:
