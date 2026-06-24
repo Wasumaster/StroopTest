@@ -68,6 +68,7 @@ keys:
   quit: escape
 ```
 
+
 ---
 
 ## 4. Oś czasu pojedynczej próby (Trial Timeline)

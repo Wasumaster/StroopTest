@@ -113,7 +113,6 @@ def main():
         procedura.pokaz_ekran_tekstowy(okno, config["messages"]["end_screen"], config, config["keys"]["continue"])
         
     finally:
-        # ---> SEKRYTNY MECHANIZM ZAPISU AWARYJNEGO <---
         # Nawet gdy PsychoPy ulegnie awarii w locie, lub wyjdziesz na "Eskepie", wchodzimy tutaj:
         if globalne_wyniki:  # Zapisujemy plik tylko, jeśli zdążyliśmy zarejestrować co najmniej 1 próbę
             katalog_wynikow = os.path.join(katalog_glowny, config["paths"]["results_dir"])
